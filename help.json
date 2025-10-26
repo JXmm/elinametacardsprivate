@@ -2,16 +2,16 @@
     {
         "id": 1,
         "type": "block",
-        "question": "What does this card reveal about my fear?"
+        "question": "Что вы видите на этой карте? Что здесь происходит?"
     },
     {
         "id": 2,
-        "type": "resource",
-        "question": "Where have I already shown resource in my life?"
+        "type": "block",
+        "question": "Что вы чувствуете, глядя на карту? Какие мысли, эмоции возникают?"
     },
     {
         "id": 3,
         "type": "block",
-        "question": "What am I willing to let go of today?"
+        "question": "Что эта карта говорит о вас? О вашей ситуации?"
     }
 ]

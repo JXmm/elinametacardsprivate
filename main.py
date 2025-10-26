@@ -90,8 +90,12 @@ def create_router(cards, help_questions):
         await callback.answer()
         user_id = callback.from_user.id
 
+        # Temp message for block card immediately
+        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блок...")
+
         GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
         if not GITHUB_TOKEN:
+            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
             await callback.message.answer("Токен GitHub не установлен")
             return
 
@@ -101,6 +105,7 @@ def create_router(cards, help_questions):
         resource_cards = [c for c in cards if c['type'] == 'resource']
 
         if not block_cards or not resource_cards:
+            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
             await callback.message.answer("Ошибка: Карты недоступны!")
             return
 
@@ -109,16 +114,15 @@ def create_router(cards, help_questions):
 
         block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
         if not block_image_bytes:
+            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
             await callback.message.answer("Блок-карта не найдена")
             return
 
         resource_image_bytes = await download_github_image(resource_card['image_url'], GITHUB_TOKEN)
         if not resource_image_bytes:
+            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
             await callback.message.answer("Ресурс-карта не найдена")
             return
-
-        # Temp message for block card
-        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блок...")
 
         await callback.bot.send_photo(
             chat_id=user_id,
