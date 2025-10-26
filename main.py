@@ -256,26 +256,33 @@ async def insights_handler(callback: CallbackQuery) -> None:
 
 
 
-async def main():
+def main():
     logging.basicConfig(level=logging.INFO)
 
     WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "elina_webhook_2025")
     WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
     
     if os.getenv("RENDER_EXTERNAL_URL"):
-        # === WEBHOOK MODE (Render) ===
+        # Webhook mode
         external_url = os.getenv("RENDER_EXTERNAL_URL")
         webhook_url = f"{external_url}{WEBHOOK_PATH}"
 
-        await bot.set_webhook(
-            url=webhook_url,
-            secret_token=WEBHOOK_SECRET,
-            drop_pending_updates=True
-        )
+        # Инициализация бота и диспетчера
+        bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        dp = Dispatcher()
+        dp.include_router(router)
+
+        async def on_startup(app):
+            await bot.set_webhook(
+                url=webhook_url,
+                secret_token=WEBHOOK_SECRET,
+                drop_pending_updates=True
+            )
 
         app = web.Application()
+        app.on_startup.append(on_startup)
         SimpleRequestHandler(
-            dispatcher=dp,      # ← именно Dispatcher, не Router!
+            dispatcher=dp,
             bot=bot,
             secret_token=WEBHOOK_SECRET,
         ).register(app, path=WEBHOOK_PATH)
@@ -283,8 +290,15 @@ async def main():
         setup_application(app, dp, bot=bot)
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
     else:
-        # === POLLING MODE (локально) ===
-        await dp.start_polling(bot, skip_updates=True)
+        # Polling mode (локально)
+        async def run_polling():
+            bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+            dp = Dispatcher()
+            dp.include_router(router)
+            await dp.start_polling(bot, skip_updates=True)
+
+        asyncio.run(run_polling())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
+
