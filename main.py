@@ -65,7 +65,7 @@ def create_router(cards, help_questions):
 
         await message.answer(greeting)
         await asyncio.sleep(2)
-        text = "Сейчас подумай о своем запросе... \n\nИ напиши его здесь одним предложением. \n\nФизическое действие позволит лучше погрузиться в запрос, а также понять его истинность.  \n\n Но ты можешь, подумав, просто добавить сердечко, чтобы начать ❤️   ✨"
+        text = "Когда ты вытянешь карту, например, блок, не спеши сразу читать описание. Посмотри на карту и выпиши свои чувства. \nПервое чувство, смотри и продолжай выписывать остальные, которые постепенно появляются. \n\nДальше, смотря на список, задай себе вопрос: <b>“Какое чувство ключевое?”</b> Продолжай смотреть на карту и подумай, <b>каким событием вызвано это чувство</b>, <b>о чем карта говорит, что напоминает</b>. \n\nИ только после этого начинай читать описание карты!✨  \n\nГотова? \n\nА сейчас подумай и напиши мне свой запрос, над которым хочешь поработать сегодня...✨"
         await message.answer(text)
 
         user_states[user_id] = {'step': 'waiting_for_request'}
@@ -82,8 +82,8 @@ def create_router(cards, help_questions):
         update_current_request(user_id, message.text)
 
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Вытащить карты", callback_data="draw_cards")
-        await message.answer("ОТЛИЧНО!☺️ \nДавай начнем!💫", reply_markup=keyboard.as_markup())
+        keyboard.button(text="Отправить запрос💫", callback_data="draw_cards")
+        await message.answer("✨", reply_markup=keyboard.as_markup())
 
     @router.callback_query(lambda c: c.data == "draw_cards")
     async def draw_cards_handler(callback: CallbackQuery) -> None:
@@ -117,18 +117,32 @@ def create_router(cards, help_questions):
             await callback.message.answer("Ресурс-карта не найдена")
             return
 
+        # Temp message for block card
+        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блок...")
+
         await callback.bot.send_photo(
             chat_id=user_id,
             photo=BufferedInputFile(block_image_bytes, filename=f"{block_card['id']}.png"),
             caption=block_card['description']
         )
-        await asyncio.sleep(2)
+
+        # Delete temp message
+        await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
+
+        # Wait 5 minutes before resource card
+        await asyncio.sleep(50)
+
+        # Temp message for resource card
+        resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту ресурс...")
 
         await callback.bot.send_photo(
             chat_id=user_id,
             photo=BufferedInputFile(resource_image_bytes, filename=f"{resource_card['id']}.png"),
             caption=resource_card['description']
         )
+
+        # Delete temp message
+        await callback.bot.delete_message(chat_id=user_id, message_id=resource_temp.message_id)
 
         save_request(user_id, request_text, block_card['id'], resource_card['id'],
                      block_card['description'], resource_card['description'])
@@ -144,15 +158,15 @@ def create_router(cards, help_questions):
         asyncio.create_task(send_followup_questions(user_id, callback.bot))
 
     async def send_followup_questions(user_id: int, bot: Bot):
-        await asyncio.sleep(300)
+        await asyncio.sleep(100)
 
         state = user_states.get(user_id)
         if not state or state.get('step') != 'waiting_for_feedback':
             return
 
-        text = "Получила ли ты ответ на свой запрос, или тебе нужны подсказки?🆘"
+        text = "Получила ли ты ответ на свой запрос, или тебе нужны подсказки?"
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Нужны подсказки", callback_data="need_hints")
+        keyboard.button(text="Нужны подсказки✨", callback_data="need_hints")
         keyboard.button(text="Получила❤️", callback_data="received_insights")
 
         try:
@@ -193,7 +207,7 @@ def create_router(cards, help_questions):
         user_id = callback.from_user.id
         user_states.pop(user_id, None)
 
-        text = "Замечательно! Пусть твой день будет наполнен ясностью и целью. Я здесь, если нужно другое гадание или хочешь углубить понимание."
+        text = "Замечательно! Пусть твой день будет наполнен ясностью и целью. Я здесь, если хочешь посмотреть другой запрос или глубже раскрыть понимание."
         await callback.message.answer(text)
 
     return router
