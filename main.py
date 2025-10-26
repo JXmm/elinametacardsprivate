@@ -64,7 +64,7 @@ def create_router(cards, help_questions):
             greeting = f"Дорогая, {first_name}...\n\nПривет! 🌿"
 
         await message.answer(greeting)
-        await asyncio.sleep(2)
+        await asyncio.sleep(10)
         text = "Когда ты вытянешь карту, например, блок, не спеши сразу читать описание. Посмотри на карту и выпиши свои чувства. \nПервое чувство, смотри и продолжай выписывать остальные, которые постепенно появляются. \n\nДальше, смотря на список, задай себе вопрос: <b>“Какое чувство ключевое?”</b> Продолжай смотреть на карту и подумай, <b>каким событием вызвано это чувство</b>, <b>о чем карта говорит, что напоминает</b>. \n\nИ только после этого начинай читать описание карты!✨  \n\nГотова? \n\nА сейчас подумай и напиши мне свой запрос, над которым хочешь поработать сегодня...✨"
         await message.answer(text)
 
@@ -134,7 +134,7 @@ def create_router(cards, help_questions):
         await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
 
         # Wait 5 minutes before resource card
-        await asyncio.sleep(50)
+        await asyncio.sleep(1)
 
         # Temp message for resource card
         resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту ресурс...")
@@ -162,7 +162,7 @@ def create_router(cards, help_questions):
         asyncio.create_task(send_followup_questions(user_id, callback.bot))
 
     async def send_followup_questions(user_id: int, bot: Bot):
-        await asyncio.sleep(100)
+        await asyncio.sleep(300)
 
         state = user_states.get(user_id)
         if not state or state.get('step') != 'waiting_for_feedback':
@@ -170,7 +170,7 @@ def create_router(cards, help_questions):
 
         text = "Получила ли ты ответ на свой запрос, или тебе нужны подсказки?"
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Нужны подсказки✨", callback_data="need_hints")
+        keyboard.button(text="Подсказки✨", callback_data="need_hints")
         keyboard.button(text="Получила❤️", callback_data="received_insights")
 
         try:
