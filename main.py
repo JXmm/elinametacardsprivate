@@ -10,7 +10,10 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery, BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message, CallbackQuery, BufferedInputFile,
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -26,6 +29,9 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
     print("❌ BOT_TOKEN not found in .env")
     sys.exit(1)
+
+# URL Mini App (твой GitHub Pages)
+MINI_APP_URL = "https://jxmm.github.io/elinametacards-miniapp/"
 
 # Глобальное состояние (для MVP)
 user_states = {}
@@ -83,11 +89,41 @@ def create_router(cards, help_questions):
         user_states[user_id] = {'step': 'waiting_for_request'}
         clear_current_request(user_id)
 
-    # --- Обработка запроса ---
+    # --- /cards — новая команда для Mini App ---
+    @router.message(Command("cards"))
+    async def cards_miniapp_handler(message: Message) -> None:
+        web_app = WebAppInfo(url=MINI_APP_URL)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔮 Открыть метафорические карты", web_app=web_app)
+        await message.answer(
+            "Нажми кнопку ниже, чтобы получить карту дня прямо внутри Telegram:",
+            reply_markup=builder.as_markup()
+        )
+
+    # --- Обработка данных из Mini App ---
+    @router.message(lambda message: message.web_app_data)
+    async def handle_web_app_data(message: Message) -> None:
+        try:
+            data = json.loads(message.web_app_data.data)
+            card_name = data.get("card", "Трансформация")
+            await message.answer(
+                f"✨ Ты выбрала карту: <b>{card_name}</b>\n\n"
+                "Посмотри на неё внимательно. Какие чувства она вызывает?\n"
+                "Что она тебе напоминает? Что хочет сказать?\n\n"
+                "Когда будешь готова — напиши мне свой запрос, и мы углубимся в работу. 🌿",
+                parse_mode=ParseMode.HTML
+            )
+            # Можно сохранить выбор в БД, если нужно
+        except Exception as e:
+            logging.error(f"Ошибка обработки данных Mini App: {e}")
+            await message.answer("Получена карта! Готова работать с ней? Напиши свой запрос.")
+
+    # --- Обработка текстовых сообщений (запрос) ---
     @router.message()
     async def request_handler(message: Message) -> None:
         user_id = message.from_user.id
         if user_id not in user_states or user_states[user_id].get('step') != 'waiting_for_request':
+            # Если пользователь просто пишет вне сценария — можно игнорировать или ответить
             return
 
         user_states[user_id]['request'] = message.text
@@ -98,7 +134,7 @@ def create_router(cards, help_questions):
         keyboard.button(text="Отправить запрос💫", callback_data="draw_cards")
         await message.answer("Отлично!✨", reply_markup=keyboard.as_markup())
 
-    # --- Вытягивание карт ---
+    # --- Вытягивание карт (остальной код без изменений) ---
     @router.callback_query(lambda c: c.data == "draw_cards")
     async def draw_cards_handler(callback: CallbackQuery) -> None:
         await callback.answer()
@@ -233,11 +269,16 @@ def create_router(cards, help_questions):
         if not GITHUB_TOKEN:
             await message.answer("Сервис временно недоступен: отсутствует токен доступа.")
             return
-        cards_block = [c for c in cards if c['type'] == 'block']
-        if not cards_block:
-            await message.answer("Карты блок недоступны.")
-            return
-        card = random.choice(cards_block)
+        user_id = message.from_user.id
+        card = None
+        if user_id in user_states and 'block_card' in user_states[user_id]:
+            card = user_states[user_id]['block_card']
+        else:
+            cards_block = [c for c in cards if c['type'] == 'block']
+            if not cards_block:
+                await message.answer("Карты блок недоступны.")
+                return
+            card = random.choice(cards_block)
         img = await download_github_image(card['image_url'], GITHUB_TOKEN)
         if not img:
             await message.answer("Не удалось загрузить изображение.")
@@ -252,11 +293,16 @@ def create_router(cards, help_questions):
         if not GITHUB_TOKEN:
             await message.answer("Сервис временно недоступен: отсутствует токен доступа.")
             return
-        cards_res = [c for c in cards if c['type'] == 'resource']
-        if not cards_res:
-            await message.answer("Карты ресурс недоступны.")
-            return
-        card = random.choice(cards_res)
+        user_id = message.from_user.id
+        card = None
+        if user_id in user_states and 'resource_card' in user_states[user_id]:
+            card = user_states[user_id]['resource_card']
+        else:
+            cards_res = [c for c in cards if c['type'] == 'resource']
+            if not cards_res:
+                await message.answer("Карты ресурс недоступны.")
+                return
+            card = random.choice(cards_res)
         img = await download_github_image(card['image_url'], GITHUB_TOKEN)
         if not img:
             await message.answer("Не удалось загрузить изображение.")
