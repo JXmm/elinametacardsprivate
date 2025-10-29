@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Элина Гонцова - Энергокоуч</title>
+    <meta name="description" content="Дипломированный энергокоуч Элина Гонцова">
+
+    <!-- Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f59e0b, #eab308);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .profile {
+            margin-bottom: 30px;
+        }
+
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            border: 4px solid rgba(255,255,255,0.3);
+            object-fit: cover;
+        }
+
+        .name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .title {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.02);
+        }
+
+        .btn-outline {
+            background: white;
+            color: #f59e0b;
+            border: 2px solid white;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255,255,255,0.9);
+            transform: scale(1.02);
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="profile">
+            <img src="mini-app-energy-glow-up/dist/elina-photo-CDW-546J.png" alt="Элина Гонцова" class="avatar">
+            <div class="name">Элина Гонцова</div>
+            <div class="title">Энергокоуч | Терапевт</div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="sendMessage('contact_therapy')">
+                <span>🧘‍♀️</span>
+                Записаться на терапию
+            </button>
+
+            <button class="btn btn-outline" onclick="sendMessage('visit_channel')">
+                <span>📺</span>
+                Перейти в канал
+            </button>
+
+            <button class="btn btn-primary" onclick="sendMessage('razbor')">
+                <span>🎭</span>
+                Первая терапия бесплатно
+            </button>
+        </div>
+
+        <div class="footer">
+            Элина Гонцова — Энергокоуч<br>
+            Управление энергией и трансформация жизни
+        </div>
+    </div>
+
+    <script>
+        // Telegram Web App initialization
+        let tg;
+        try {
+            tg = window.Telegram?.WebApp;
+            if (tg) {
+                tg.ready();
+                tg.expand();
+
+                // Set theme colors
+                tg.setHeaderColor('#f59e0b');
+                tg.setBackgroundColor('#ffffff');
+            } else {
+                console.log('Telegram Web App not available');
+            }
+        } catch (error) {
+            console.log('Telegram Web App error:', error);
+        }
+
+        // Send data to bot
+        function sendMessage(action) {
+            const data = { action: action };
+
+            try {
+                if (tg && tg.sendData) {
+                    tg.sendData(JSON.stringify(data));
+
+                    // Show notification
+                    if (tg.showPopup) {
+                        tg.showPopup({
+                            title: action === 'contact_therapy' ? 'Запись на терапию' :
+                                   action === 'visit_channel' ? 'Переход в канал' :
+                                   'Бесплатная терапия',
+                            message: 'Спасибо за интерес! Мы свяжемся с вами.',
+                            buttons: [{type: 'close'}]
+                        });
+                    }
+                } else {
+                    // Fallback for web version
+                    const urls = {
+                        contact_therapy: 'https://t.me/elina_goncova',
+                        visit_channel: 'https://t.me/energy_elina',
+                        razbor: 'https://t.me/elina_goncova?text=РАЗБОР'
+                    };
+
+                    window.open(urls[action] || 'https://t.me/elina_goncova', '_blank');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                // Fallback
+                window.open('https://t.me/elina_goncova', '_blank');
+            }
+        }
+
+        // Handle Android back button
+        if (tg) {
+            tg.onEvent('backButtonClicked', function(){
+                tg.close();
+            });
+
+            tg.BackButton.show();
+        }
+    </script>
+</body>
+</html>
