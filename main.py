@@ -30,10 +30,10 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN not found in .env")
     sys.exit(1)
 
-# URL Mini App (твой GitHub Pages)
-MINI_APP_URL = "https://jxmm.github.io/elinametacards-miniapp/"
+# URL Mini App — ИСПРАВЛЕНО: без пробелов в конце!
+MINI_APP_URL = "https://jxmm.github.io/energy-glow-up-hub/"
 
-# Глобальное состояние (для MVP)
+# Глобальное состояние (для основного сценария запроса)
 user_states = {}
 
 class CardNumber(StatesGroup):
@@ -61,7 +61,10 @@ def create_router(cards, help_questions):
     if not GITHUB_TOKEN:
         logging.warning("⚠️ GITHUB_TOKEN не задан! Загрузка изображений из приватного репозитория невозможна.")
 
-    # --- /start ---
+    # ========================
+    # 🔹 КОМАНДЫ — САМЫЕ ПЕРВЫЕ
+    # ========================
+
     @router.message(CommandStart())
     async def start_handler(message: Message) -> None:
         user_id = message.from_user.id
@@ -75,213 +78,54 @@ def create_router(cards, help_questions):
             greeting = f"Дорогая, {first_name}...\n\nПривет! 🌿"
 
         await message.answer(greeting)
-        await asyncio.sleep(1)
-        text = (
-            "Когда ты вытянешь карту, например, блок, не спеши сразу читать описание. "
-            "Посмотри на карту и выпиши свои чувства. \nПервое чувство, смотри и продолжай выписывать остальные, "
-            "которые постепенно появляются. \n\nДальше, смотря на список, задай себе вопрос: "
-            "<b>“Какое чувство ключевое?”</b> Продолжай смотреть на карту и подумай, "
-            "<b>каким событием вызвано это чувство</b>, <b>о чем карта говорит, что напоминает</b>. \n\n"
-            "И только после этого начинай читать описание карты!✨  \n\nГотова? \n\n"
-            "А сейчас подумай и напиши мне свой запрос, над которым хочешь поработать сегодня...✨"
-        )
-        await message.answer(text, parse_mode=ParseMode.HTML)
+        await asyncio.sleep(3)
+
+        await message.answer("Перед началом работы c картами сделай, пожалуйста, несколько глубоких вдохов и успокой свои мысли. 😌 \n\n " )
+        await asyncio.sleep(15)
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Да ❤️", callback_data="ready_yes")]
+        ])
+        await message.answer("Готова? ✨", reply_markup=keyboard)
+
+    @router.callback_query(lambda c: c.data == "ready_yes")
+    async def ready_yes_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+
+        text = "Cейчас подумай... и напиши мне свой запрос, над которым хочешь поработать сегодня...✨"
+        await callback.message.answer(text, parse_mode=ParseMode.HTML)
+
         user_states[user_id] = {'step': 'waiting_for_request'}
         clear_current_request(user_id)
 
-    # --- /cards — новая команда для Mini App ---
-    @router.message(Command("cards"))
+    @router.message(Command("aboutme"))
     async def cards_miniapp_handler(message: Message) -> None:
         web_app = WebAppInfo(url=MINI_APP_URL)
         builder = InlineKeyboardBuilder()
-        builder.button(text="🔮 Открыть метафорические карты", web_app=web_app)
+        builder.button(text=" Давай 🐾", web_app=web_app)
         await message.answer(
-            "Нажми кнопку ниже, чтобы получить карту дня прямо внутри Telegram:",
+            "Здесь я поделюсь, чем я могу быть полезна тебе ❤️",
             reply_markup=builder.as_markup()
         )
 
-    # --- Обработка данных из Mini App ---
-    @router.message(lambda message: message.web_app_data)
-    async def handle_web_app_data(message: Message) -> None:
-        try:
-            data = json.loads(message.web_app_data.data)
-            card_name = data.get("card", "Трансформация")
-            await message.answer(
-                f"✨ Ты выбрала карту: <b>{card_name}</b>\n\n"
-                "Посмотри на неё внимательно. Какие чувства она вызывает?\n"
-                "Что она тебе напоминает? Что хочет сказать?\n\n"
-                "Когда будешь готова — напиши мне свой запрос, и мы углубимся в работу. 🌿",
-                parse_mode=ParseMode.HTML
-            )
-            # Можно сохранить выбор в БД, если нужно
-        except Exception as e:
-            logging.error(f"Ошибка обработки данных Mini App: {e}")
-            await message.answer("Получена карта! Готова работать с ней? Напиши свой запрос.")
-
-    # --- Обработка текстовых сообщений (запрос) ---
-    @router.message()
-    async def request_handler(message: Message) -> None:
-        user_id = message.from_user.id
-        if user_id not in user_states or user_states[user_id].get('step') != 'waiting_for_request':
-            # Если пользователь просто пишет вне сценария — можно игнорировать или ответить
-            return
-
-        user_states[user_id]['request'] = message.text
-        user_states[user_id]['step'] = 'request_received'
-        update_current_request(user_id, message.text)
-
-        keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Отправить запрос💫", callback_data="draw_cards")
-        await message.answer("Отлично!✨", reply_markup=keyboard.as_markup())
-
-    # --- Вытягивание карт (остальной код без изменений) ---
-    @router.callback_query(lambda c: c.data == "draw_cards")
-    async def draw_cards_handler(callback: CallbackQuery) -> None:
-        await callback.answer()
-        user_id = callback.from_user.id
-
-        if not GITHUB_TOKEN:
-            await callback.message.answer("Сервис временно недоступен: отсутствует токен доступа к картам.")
-            return
-
-        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блок...")
-        request_text = user_states.get(user_id, {}).get('request', "No specific request")
-
-        block_cards = [c for c in cards if c['type'] == 'block']
-        resource_cards = [c for c in cards if c['type'] == 'resource']
-
-        if not block_cards or not resource_cards:
-            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
-            await callback.message.answer("Ошибка: карты не найдены!")
-            return
-
-        block_card = random.choice(block_cards)
-        resource_card = random.choice(resource_cards)
-
-        block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
-        if not block_image_bytes:
-            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
-            await callback.message.answer("Не удалось загрузить блок-карту.")
-            return
-
-        resource_image_bytes = await download_github_image(resource_card['image_url'], GITHUB_TOKEN)
-        if not resource_image_bytes:
-            await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
-            await callback.message.answer("Не удалось загрузить ресурс-карту.")
-            return
-
-        # Отправка блок-карты
-        await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
-        kb_block = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Описание", callback_data=f"desc_block:{block_card['id']}")]
-        ])
-        await callback.bot.send_photo(
-            chat_id=user_id,
-            photo=BufferedInputFile(block_image_bytes, filename=f"{block_card['id']}.png"),
-            reply_markup=kb_block
-        )
-
-        await asyncio.sleep(1)  # ← для тестов; в продакшене — 300
-
-        # Отправка ресурс-карты
-        resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту ресурс...")
-        await asyncio.sleep(0.5)
-        await callback.bot.delete_message(chat_id=user_id, message_id=resource_temp.message_id)
-
-        kb_resource = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Описание", callback_data=f"desc_resource:{resource_card['id']}")]
-        ])
-        await callback.bot.send_photo(
-            chat_id=user_id,
-            photo=BufferedInputFile(resource_image_bytes, filename=f"{resource_card['id']}.png"),
-            reply_markup=kb_resource
-        )
-
-        save_request(user_id, request_text, block_card['id'], resource_card['id'],
-                     block_card['description'], resource_card['description'])
-        clear_current_request(user_id)
-
-        user_states[user_id] = {
-            'step': 'waiting_for_feedback',
-            'block_card': block_card,
-            'resource_card': resource_card,
-            'request': request_text
-        }
-
-        asyncio.create_task(send_followup_questions(user_id, callback.bot))
-
-    async def send_followup_questions(user_id: int, bot: Bot):
-        await asyncio.sleep(300)
-        state = user_states.get(user_id)
-        if not state or state.get('step') != 'waiting_for_feedback':
-            return
-
-        text = "Получила ли ты ответ на свой запрос, или тебе нужны подсказки?"
-        keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Подсказки✨", callback_data="need_hints")
-        keyboard.button(text="Получила❤️", callback_data="received_insights")
-
-        try:
-            await bot.send_message(chat_id=user_id, text=text, reply_markup=keyboard.as_markup())
-            user_states[user_id]['step'] = 'waiting_for_hints_or_done'
-        except Exception as e:
-            logging.warning(f"Не удалось отправить follow-up: {e}")
-
-    @router.callback_query(lambda c: c.data == "need_hints")
-    async def hints_handler(callback: CallbackQuery) -> None:
-        await callback.answer()
-        user_id = callback.from_user.id
-        state = user_states.get(user_id)
-        if not state:
-            await callback.message.answer("Извини, не могу найти твою сессию.")
-            return
-
-        block_card = state['block_card']
-        resource_card = state['resource_card']
-
-        block_qs = [q for q in help_questions if q['type'] == 'block']
-        res_qs = [q for q in help_questions if q['type'] == 'resource']
-
-        if block_qs:
-            q = random.choice(block_qs)
-            await callback.bot.send_message(user_id, f"{block_card['name']}: {q['question']}")
-            await asyncio.sleep(10)
-
-        if res_qs:
-            q = random.choice(res_qs)
-            await callback.bot.send_message(user_id, f"{resource_card['name']}: {q['question']}")
-
-        user_states[user_id]['step'] = 'hints_sent'
-
-    @router.callback_query(lambda c: c.data == "received_insights")
-    async def insights_handler(callback: CallbackQuery) -> None:
-        await callback.answer()
-        user_id = callback.from_user.id
-        user_states.pop(user_id, None)
-        await callback.message.answer(
-            "Замечательно! Пусть твой день будет наполнен ясностью и целью. "
-            "Я здесь, если хочешь посмотреть другой запрос или глубже раскрыть понимание."
-        )
-
-    # --- Команды ---
     @router.message(Command("block"))
     async def block_command(message: Message) -> None:
+        logging.info("🔍 /block: запущена")
         if not GITHUB_TOKEN:
-            await message.answer("Сервис временно недоступен: отсутствует токен доступа.")
+            await message.answer("⚠️ GITHUB_TOKEN не задан!")
             return
-        user_id = message.from_user.id
-        card = None
-        if user_id in user_states and 'block_card' in user_states[user_id]:
-            card = user_states[user_id]['block_card']
-        else:
-            cards_block = [c for c in cards if c['type'] == 'block']
-            if not cards_block:
-                await message.answer("Карты блок недоступны.")
-                return
-            card = random.choice(cards_block)
+        cards_block = [c for c in cards if c['type'] == 'block']
+        logging.info(f"Найдено блок-карт: {len(cards_block)}")
+        if not cards_block:
+            await message.answer("❌ Карты типа 'block' не найдены в базе.")
+            return
+        card = random.choice(cards_block)
+        logging.info(f"Выбрана карта: ID={card['id']}, URL={card['image_url']}")
         img = await download_github_image(card['image_url'], GITHUB_TOKEN)
         if not img:
-            await message.answer("Не удалось загрузить изображение.")
+            await message.answer(f"💥 Не удалось загрузить изображение для карты '{card['name']}'.")
+            logging.error(f"Ошибка загрузки: {card['image_url']}")
             return
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Описание", callback_data=f"desc_block:{card['id']}")]
@@ -290,22 +134,21 @@ def create_router(cards, help_questions):
 
     @router.message(Command("resource"))
     async def resource_command(message: Message) -> None:
+        logging.info("🔍 /resource: запущена")
         if not GITHUB_TOKEN:
-            await message.answer("Сервис временно недоступен: отсутствует токен доступа.")
+            await message.answer("⚠️ GITHUB_TOKEN не задан!")
             return
-        user_id = message.from_user.id
-        card = None
-        if user_id in user_states and 'resource_card' in user_states[user_id]:
-            card = user_states[user_id]['resource_card']
-        else:
-            cards_res = [c for c in cards if c['type'] == 'resource']
-            if not cards_res:
-                await message.answer("Карты ресурс недоступны.")
-                return
-            card = random.choice(cards_res)
+        cards_res = [c for c in cards if c['type'] == 'resource']
+        logging.info(f"Найдено ресурс-карт: {len(cards_res)}")
+        if not cards_res:
+            await message.answer("❌ Карты типа 'resource' не найдены в базе.")
+            return
+        card = random.choice(cards_res)
+        logging.info(f"Выбрана карта: ID={card['id']}, URL={card['image_url']}")
         img = await download_github_image(card['image_url'], GITHUB_TOKEN)
         if not img:
-            await message.answer("Не удалось загрузить изображение.")
+            await message.answer(f"💥 Не удалось загрузить изображение для карты '{card['name']}'.")
+            logging.error(f"Ошибка загрузки: {card['image_url']}")
             return
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Описание", callback_data=f"desc_resource:{card['id']}")]
@@ -314,11 +157,12 @@ def create_router(cards, help_questions):
 
     @router.message(Command("number"))
     async def number_command(message: Message, state: FSMContext) -> None:
-        if not GITHUB_TOKEN:
-            await message.answer("Сервис временно недоступен: отсутствует токен доступа.")
-            return
         await message.answer("Введите номер карты (от 1 до 76):")
         await state.set_state(CardNumber.waiting_for_number)
+
+    # ========================
+    # 🔹 FSM и специальные обработчики
+    # ========================
 
     @router.message(CardNumber.waiting_for_number)
     async def number_input_handler(message: Message, state: FSMContext) -> None:
@@ -339,14 +183,11 @@ def create_router(cards, help_questions):
 
         img = await download_github_image(card['image_url'], GITHUB_TOKEN)
         if not img:
-            await message.answer("Не удалось загрузить изображение.")
+            await message.answer(f"Не удалось загрузить изображение для карты ID {card_id}.")
             await state.clear()
             return
 
-        card_type = card['type']
-        if card_type not in ('block', 'resource'):
-            card_type = 'block'
-
+        card_type = card['type'] if card['type'] in ('block', 'resource') else 'block'
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Описание", callback_data=f"desc_{card_type}:{card['id']}")]
         ])
@@ -356,7 +197,291 @@ def create_router(cards, help_questions):
         )
         await state.clear()
 
-    # --- Коллбэк описания ---
+    @router.message(lambda message: message.web_app_data)
+    async def handle_web_app_data(message: Message) -> None:
+        try:
+            data = json.loads(message.web_app_data.data)
+            if "action" in data:
+                action = data.get("action")
+                if action == "contact_therapy":
+                    await message.answer(
+                        "Спасибо за интерес к терапии! ✨\n\n"
+                        "Я дипломированный энергокоуч и помогаю людям работать с энергией для трансформации и роста.\n\n"
+                        "Напиши мне @elina_goncova для записи на консультацию или расскажи, с какими вопросами ты хотела бы поработать. 🚀"
+                    )
+                elif action == "visit_channel":
+                    await message.answer(
+                        "👋 Приветствуем в канале Energy Elina!\n\n"
+                        "Там я делюсь энергопрактиками, раскладами карт и инсайтами для трансформации.\n\n"
+                        "Подпишись: @energy_elina\n\n"
+                        "Что ты хотела бы узнать или получить помощь? 🌸"
+                    )
+                elif action == "razbor":
+                    await message.answer(
+                        "Спасибо, что написала РАЗБОР! 🥰\n\n"
+                        "Это специальная форма оплаты по сердцу для первой терапии.\n\n"
+                        "Мне @elina_goncova — так как работает наша система: после первичной диагностики я называла сумму, которая резоансна для человека. Иногда это может быть даже 1 рублей.\n\n"
+                        "Расскажи о своем запросе, с чем хочешь поработать? 💫"
+                    )
+                else:
+                    await message.answer("Спасибо за взаимодействие с мини-приложением! Чем я могу тебе помочь? 🌿")
+            elif "card" in data:
+                card_name = data.get("card", "Трансформация")
+                await message.answer(
+                    f"✨ Ты выбрала карту: <b>{card_name}</b>\n\n"
+                    "Посмотри на неё внимательно. Какие чувства она вызывает?\n"
+                    "Что она тебе напоминает? Что хочет сказать?\n\n"
+                    "Когда будешь готова — напиши мне свой запрос, и мы углубимся в работу. 🌿",
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                await message.answer("Спасибо за взаимодействие с мини-приложением! Чем я могу тебе помочь? 🌿")
+        except Exception as e:
+            logging.error(f"Ошибка обработки данных Mini App: {e}")
+            await message.answer("Что-то пошло не так с мини-приложением, но мы можем работать прямо здесь! Что тебя беспокоит?")
+
+    # ========================
+    # 🔹 ОСНОВНОЙ ТЕКСТОВЫЙ ОБРАБОТЧИК — САМЫЙ ПОСЛЕДНИЙ
+    # ========================
+
+    @router.message()
+    async def request_handler(message: Message) -> None:
+        if message.text and message.text.startswith('/'):
+            return
+        user_id = message.from_user.id
+        if user_id not in user_states or user_states[user_id].get('step') != 'waiting_for_request':
+            return
+        user_states[user_id]['request'] = message.text
+        user_states[user_id]['step'] = 'request_received'
+        update_current_request(user_id, message.text)
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="Отправить запрос💫", callback_data="draw_cards")
+        await message.answer("Отлично!✨ \n\nПервая карта - это блок. То, что мешает тебе в реализации твоего запроса.", reply_markup=keyboard.as_markup())
+
+    # ========================
+    # 🔹 Коллбэки
+    # ========================
+
+    @router.callback_query(lambda c: c.data == "draw_cards")
+    async def draw_cards_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+
+        if not GITHUB_TOKEN:
+            await callback.message.answer("Сервис временно недоступен: отсутствует токен доступа к картам.")
+            return
+
+        request_text = user_states.get(user_id, {}).get('request', "No specific request")
+
+        block_cards = [c for c in cards if c['type'] == 'block']
+        resource_cards = [c for c in cards if c['type'] == 'resource']
+
+        if not block_cards or not resource_cards:
+            await callback.message.answer("Ошибка: карты не найдены!")
+            return
+
+        block_card = random.choice(block_cards)
+        resource_card = random.choice(resource_cards)
+
+        block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
+        if not block_image_bytes:
+            await callback.message.answer("Не удалось загрузить блок-карту.")
+            return
+
+        # Сохраняем данные карты в состоянии, чтобы использовать позже
+        user_states[user_id]['block_card'] = block_card
+        user_states[user_id]['resource_card'] = resource_card
+        user_states[user_id]['request_text'] = request_text
+
+        # Показываем временное сообщение
+        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блока...")
+
+        # Отправляем БЛОК-карту БЕЗ кнопки
+        await callback.bot.send_photo(
+            chat_id=user_id,
+            photo=BufferedInputFile(block_image_bytes, filename=f"{block_card['id']}.png")
+        )
+
+        # Удаляем временное сообщение
+        await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
+
+        await asyncio.sleep(2)
+        await callback.bot.send_message(user_id, "Что ты тут видишь?")
+
+        await asyncio.sleep(10)
+        await callback.bot.send_message(user_id, "О чем карта говорит, что напоминает?")
+
+        await asyncio.sleep(10)
+        await callback.bot.send_message(user_id, "Какое чувство она вызывает? Какими событиями вызвано это чувство?")
+
+        await asyncio.sleep(15)
+
+        # Кнопки: описание или показать ресурс
+        final_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Подсказки ✨", callback_data=f"desc_block:{block_card['id']}"),
+                InlineKeyboardButton(text="Хочу ресурс 💫", callback_data="show_resource")
+            ]
+        ])
+        await callback.bot.send_message(
+            user_id,
+            "Все ли тебе понятно или нужны подсказки? ❤️",
+            reply_markup=final_kb
+        )
+        
+    @router.callback_query(lambda c: c.data == "show_resource")
+    async def show_resource_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+
+        if user_id not in user_states:
+            await callback.message.answer("Сессия устарела. Начни с /start.")
+            return
+
+        resource_card = user_states[user_id].get('resource_card')
+        block_card = user_states[user_id].get('block_card')
+
+        if not resource_card or not block_card:
+            await callback.message.answer("Ошибка: данные карт утеряны.")
+            return
+
+        GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+        if not GITHUB_TOKEN:
+            await callback.message.answer("⚠️ Сервис временно недоступен.")
+            return
+
+        resource_image_bytes = await download_github_image(resource_card['image_url'], GITHUB_TOKEN)
+        if not resource_image_bytes:
+            await callback.message.answer("Не удалось загрузить ресурс-карту.")
+            return
+
+        # Анимация "Вытаскиваем карту ресурс..."
+        resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту ресурс...")
+        await asyncio.sleep(3)
+        await callback.bot.delete_message(chat_id=user_id, message_id=resource_temp.message_id)
+
+        # Отправляем РЕСУРС-карту БЕЗ кнопки
+        await callback.bot.send_photo(
+            chat_id=user_id,
+            photo=BufferedInputFile(resource_image_bytes, filename=f"{resource_card['id']}.png")
+        )
+
+        await asyncio.sleep(2)
+        await callback.bot.send_message(user_id, "А что ты видишь тут?")
+
+        await asyncio.sleep(10)
+        await callback.bot.send_message(user_id, "Понимаешь ли ты, о чем говорит тебе эта карта?")
+
+        await asyncio.sleep(10)
+        await callback.bot.send_message(user_id, "Что тебе нужно сделать, чтобы это помогло с решением твоего запроса?")
+
+        await asyncio.sleep(10)
+
+        # Кнопки: описание или подтверждение понимания
+        final_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Подсказки ✨", callback_data=f"desc_resource:{resource_card['id']}"),
+                InlineKeyboardButton(text="Все понятно ☺️", callback_data="resource_understood")
+            ]
+        ])
+        await callback.bot.send_message(
+            user_id,
+            "Если нужны подсказки, они тут ❤️",
+            reply_markup=final_kb
+        )
+
+    @router.callback_query(lambda c: c.data == "block_understood")
+    async def block_understood_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        await callback.message.answer("Отлично! 🌿")
+
+    @router.callback_query(lambda c: c.data == "resource_understood")
+    async def resource_understood_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+
+        if user_id not in user_states:
+            await callback.message.answer("Сессия устарела.")
+            return
+
+        # Сохраняем данные (теперь обе карты показаны)
+        request_text = user_states[user_id].get('request_text', "No specific request")
+        block_card = user_states[user_id].get('block_card')
+        resource_card = user_states[user_id].get('resource_card')
+
+        if block_card and resource_card:
+            save_request(
+                user_id,
+                request_text,
+                block_card['id'],
+                resource_card['id'],
+                block_card['description'],
+                resource_card['description']
+            )
+            clear_current_request(user_id)
+            user_states[user_id]['step'] = 'waiting_for_feedback'
+            user_states[user_id]['last_interaction'] = datetime.utcnow()
+            asyncio.create_task(send_followup_questions(user_id, callback.bot))
+
+        await callback.message.answer("Отлично! 🌿 Ты молодец!")
+
+    async def send_followup_questions(user_id: int, bot: Bot):
+        await asyncio.sleep(300)
+        state = user_states.get(user_id)
+        if not state or state.get('step') != 'waiting_for_feedback':
+            return
+
+        text = "Получила ли ты ответ на свой запрос, или тебе нужно больше понимания?"
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="Еще карты", callback_data="need_hints")
+        keyboard.button(text="Получила❤️", callback_data="received_insights")
+
+        try:
+            await bot.send_message(chat_id=user_id, text=text, reply_markup=keyboard.as_markup())
+            user_states[user_id]['step'] = 'waiting_for_hints_or_done'
+            user_states[user_id]['last_interaction'] = datetime.utcnow()
+        except Exception as e:
+            logging.warning(f"Не удалось отправить follow-up: {e}")
+
+    @router.callback_query(lambda c: c.data == "need_hints")
+    async def hints_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+        if user_id in user_states:
+            user_states[user_id]['last_interaction'] = datetime.utcnow()
+
+        text = (
+            "Зайди в пункт меню слева, и выбери себе еще карты \"Блока\" или \"Ресурса\" как дополнение к своему запросу. 🌟\n\n"
+            "Задай себе вопрос: что мне еще мешает? 🧩 или Что мне еще поможет в решении запроса? 💫\n\n"
+            "Можно выбрать еще пару таких карт. 🃏"
+        )
+        await callback.message.answer(text)
+
+    @router.callback_query(lambda c: c.data == "received_insights")
+    async def insights_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        user_id = callback.from_user.id
+        if user_id in user_states:
+            user_states[user_id]['last_interaction'] = datetime.utcnow()
+        else:
+            user_states[user_id] = {'last_interaction': datetime.utcnow()}
+
+        asyncio.create_task(schedule_final_message(user_id, callback.bot, delay=180))
+        await callback.message.answer("Пусть будет прекрасным твой день! 🌸\n\n")
+
+    async def schedule_final_message(user_id: int, bot: Bot, delay: int = 180):
+        """Отправляет финальное сообщение через `delay` секунд, если пользователь не взаимодействовал."""
+        await asyncio.sleep(delay)
+        current_state = user_states.get(user_id, {})
+        last_interaction = current_state.get('last_interaction')
+        if last_interaction:
+            if (datetime.utcnow() - last_interaction).total_seconds() >= delay:
+                try:
+                    await bot.send_message(user_id, "Пусть будет прекрасным твой день! 🌸\n\n")
+                except Exception as e:
+                    logging.warning(f"Не удалось отправить финальное сообщение: {e}")
+        user_states.pop(user_id, None)
+
     @router.callback_query(lambda c: c.data.startswith("desc_"))
     async def desc_callback(callback: CallbackQuery) -> None:
         await callback.answer()
@@ -384,11 +509,12 @@ def main():
 
     with open('cards.json', 'r', encoding='utf-8') as f:
         cards = json.load(f)
+    logging.info(f"✅ Загружено {len(cards)} карт")
     with open('help.json', 'r', encoding='utf-8') as f:
         help_questions = json.load(f)
+    logging.info(f"✅ Загружено {len(help_questions)} вопросов")
 
     if os.getenv("RENDER_EXTERNAL_URL"):
-        # Webhook (Render)
         external_url = os.getenv("RENDER_EXTERNAL_URL")
         WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
         webhook_url = f"{external_url}{WEBHOOK_PATH}"
@@ -408,7 +534,6 @@ def main():
         setup_application(app, dp, bot=bot)
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
     else:
-        # Polling (локально)
         async def run_polling():
             bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
             await bot.delete_webhook(drop_pending_updates=True)
