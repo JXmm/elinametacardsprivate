@@ -1,0 +1,35 @@
+services:
+  elina-bot:
+    build: .
+    container_name: elina-meta-cards-bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./bot_database.db:/app/bot_database.db
+    networks:
+      - bot-network
+    depends_on:
+      - db-init
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('/app/bot_database.db'); conn.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db-init:
+    build: .
+    container_name: elina-bot-db-init
+    command: ["python", "-c", "from database import init_db; init_db(); print('Database initialized')"]
+    volumes:
+      - ./bot_database.db:/app/bot_database.db   # ← исправлено: убрано data/
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge

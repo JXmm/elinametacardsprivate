@@ -30,11 +30,7 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN not found in .env")
     sys.exit(1)
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-# URL Mini App — ИСПРАВЛЕНО: без пробелов в конце!
+# URL Mini App — ИСПРАВЛЕНО: убраны пробелы в конце!
 MINI_APP_URL = "https://jxmm.github.io/elina-miniapp/"
 
 # Глобальное состояние (для основного сценария запроса)
@@ -245,7 +241,7 @@ def create_router(cards, help_questions):
             await message.answer("Что-то пошло не так с мини-приложением, но мы можем работать прямо здесь! Что тебя беспокоит?")
 
     # ========================
-    # 🔹 ОСНОВНОЙ ТЕКСТОВЫЙ ОБРАБОТЧИК — САМЫЙ ПОСЛЕДНИЙ
+    # 🔹 ОСНОВНОЙ ТЕКСТНЫЙ ОБРАБОТЧИК — САМЫЙ ПОСЛЕДНИЙ
     # ========================
 
     @router.message()
@@ -534,6 +530,12 @@ def main():
 
         app = web.Application()
         app.on_startup.append(on_startup)
+        # 👇 ДОБАВЛЕН /health эндпоинт для Render
+        async def health_check(request):
+            return web.json_response({"status": "ok"})
+        app.router.add_get("/health", health_check)
+        # 👆
+
         SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
         setup_application(app, dp, bot=bot)
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
