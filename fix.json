@@ -1,0 +1,19 @@
+import json
+
+# Читаем JSON
+with open('cards.json', 'r', encoding='utf-8') as f:
+    cards = json.load(f)
+
+# Исправляем URL с .PNG на .png
+fixed = 0
+for card in cards:
+    if 'image_url' in card and card['image_url'].endswith('.PNG'):
+        card['image_url'] = card['image_url'].replace('.PNG', '.png')
+        fixed += 1
+        print(f'Карта {card["id"]}: исправлено .PNG -> .png')
+
+# Сохраняем
+with open('cards.json', 'w', encoding='utf-8') as f:
+    json.dump(cards, f, ensure_ascii=False, indent=2)
+
+print(f'Всего исправлено {fixed} URL')
