@@ -4,7 +4,6 @@ import logging
 import os
 import random
 import sys
-import base64
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, Router
@@ -34,46 +33,25 @@ if not BOT_TOKEN:
 # URL Mini App — исправлено: убраны пробелы в конце!
 MINI_APP_URL = "https://jxmm.github.io/elina-miniapp/"
 
-# Глобальное состояние (для основного сценария запроса)
+# Глобальное состояние
 user_states = {}
 
 class CardNumber(StatesGroup):
     waiting_for_number = State()
 
-async def download_github_image(image_url: str, token: str) -> bytes | None:
+async def download_github_image(image_url: str) -> bytes | None:
     if "raw.githubusercontent.com" not in image_url:
         logging.error(f"❌ Неподдерживаемый URL: {image_url}")
         return None
 
-    # Преобразуем raw URL → GitHub API URL
-    path_parts = image_url.replace("https://raw.githubusercontent.com/", "").split("/", 3)
-    if len(path_parts) != 4:
-        logging.error(f"❌ Неверный формат raw URL: {image_url}")
-        return None
-    user, repo, branch, file_path = path_parts
-    api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{file_path}"
-
-    headers = {}
-    if token:
-        headers["Authorization"] = f"token {token}"
-        headers["Accept"] = "application/vnd.github.v3+json"
-    else:
-        logging.warning("⚠️ GITHUB_TOKEN не задан")
-        return None
-
     try:
         async with ClientSession() as session:
-            async with session.get(api_url, headers=headers) as resp:
+            async with session.get(image_url) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
-                    if "content" in data:
-                        return base64.b64decode(data["content"])
-                    else:
-                        logging.error(f"❌ Ответ API не содержит 'content': {data}")
-                        return None
+                    return await resp.read()
                 else:
                     error_text = await resp.text()
-                    logging.error(f"❌ HTTP {resp.status} при запросе к GitHub API: {api_url} — {error_text}")
+                    logging.error(f"❌ HTTP {resp.status} при загрузке изображения: {image_url} — {error_text}")
                     return None
     except Exception as e:
         logging.error(f"💥 Ошибка загрузки изображения: {e}")
@@ -81,11 +59,9 @@ async def download_github_image(image_url: str, token: str) -> bytes | None:
 
 def create_router(cards, help_questions):
     router = Router()
-    GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-    logging.info(f"GITHUB_TOKEN loaded: {'✅ yes' if GITHUB_TOKEN else '❌ no'}")
 
     # ========================
-    # 🔹 КОМАНДЫ — САМЫЕ ПЕРВЫЕ
+    # 🔹 КОМАНДЫ
     # ========================
 
     @router.message(CommandStart())
@@ -101,10 +77,10 @@ def create_router(cards, help_questions):
             greeting = f"Дорогая, {first_name}...\n\nПривет! 🌿"
 
         await message.answer(greeting)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         await message.answer("Перед началом работы c картами сделай, пожалуйста, несколько глубоких вдохов и успокой свои мысли. 😌 \n\n ")
-        await asyncio.sleep(15)
+        await asyncio.sleep(5)
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Да ❤️", callback_data="ready_yes")]
@@ -135,9 +111,6 @@ def create_router(cards, help_questions):
     @router.message(Command("block"))
     async def block_command(message: Message) -> None:
         logging.info("🔍 /block: запущена")
-        if not GITHUB_TOKEN:
-            await message.answer("⚠️ GITHUB_TOKEN не задан!")
-            return
         cards_block = [c for c in cards if c['type'] == 'block']
         logging.info(f"Найдено блок-карт: {len(cards_block)}")
         if not cards_block:
@@ -145,7 +118,7 @@ def create_router(cards, help_questions):
             return
         card = random.choice(cards_block)
         logging.info(f"Выбрана карта: ID={card['id']}, URL={card['image_url']}")
-        img = await download_github_image(card['image_url'], GITHUB_TOKEN)
+        img = await download_github_image(card['image_url'])
         if not img:
             await message.answer(f"💥 Не удалось загрузить изображение для карты '{card['name']}'.")
             logging.error(f"Ошибка загрузки: {card['image_url']}")
@@ -158,9 +131,6 @@ def create_router(cards, help_questions):
     @router.message(Command("resource"))
     async def resource_command(message: Message) -> None:
         logging.info("🔍 /resource: запущена")
-        if not GITHUB_TOKEN:
-            await message.answer("⚠️ GITHUB_TOKEN не задан!")
-            return
         cards_res = [c for c in cards if c['type'] == 'resource']
         logging.info(f"Найдено ресурс-карт: {len(cards_res)}")
         if not cards_res:
@@ -168,7 +138,7 @@ def create_router(cards, help_questions):
             return
         card = random.choice(cards_res)
         logging.info(f"Выбрана карта: ID={card['id']}, URL={card['image_url']}")
-        img = await download_github_image(card['image_url'], GITHUB_TOKEN)
+        img = await download_github_image(card['image_url'])
         if not img:
             await message.answer(f"💥 Не удалось загрузить изображение для карты '{card['name']}'.")
             logging.error(f"Ошибка загрузки: {card['image_url']}")
@@ -182,10 +152,6 @@ def create_router(cards, help_questions):
     async def number_command(message: Message, state: FSMContext) -> None:
         await message.answer("Введите номер карты (от 1 до 76):")
         await state.set_state(CardNumber.waiting_for_number)
-
-    # ========================
-    # 🔹 FSM и специальные обработчики
-    # ========================
 
     @router.message(CardNumber.waiting_for_number)
     async def number_input_handler(message: Message, state: FSMContext) -> None:
@@ -204,7 +170,7 @@ def create_router(cards, help_questions):
             await state.clear()
             return
 
-        img = await download_github_image(card['image_url'], GITHUB_TOKEN)
+        img = await download_github_image(card['image_url'])
         if not img:
             await message.answer(f"Не удалось загрузить изображение для карты ID {card_id}.")
             await state.clear()
@@ -263,10 +229,6 @@ def create_router(cards, help_questions):
             logging.error(f"Ошибка обработки данных Mini App: {e}")
             await message.answer("Что-то пошло не так с мини-приложением, но мы можем работать прямо здесь! Что тебя беспокоит?")
 
-    # ========================
-    # 🔹 ОСНОВНОЙ ТЕКСТНЫЙ ОБРАБОТЧИК — САМЫЙ ПОСЛЕДНИЙ
-    # ========================
-
     @router.message()
     async def request_handler(message: Message) -> None:
         if message.text and message.text.startswith('/'):
@@ -281,18 +243,10 @@ def create_router(cards, help_questions):
         keyboard.button(text="Отправить запрос💫", callback_data="draw_cards")
         await message.answer("Отлично!✨ \n\nПервая карта - это блок. То, что мешает тебе в реализации твоего запроса.", reply_markup=keyboard.as_markup())
 
-    # ========================
-    # 🔹 Коллбэки
-    # ========================
-
     @router.callback_query(lambda c: c.data == "draw_cards")
     async def draw_cards_handler(callback: CallbackQuery) -> None:
         await callback.answer()
         user_id = callback.from_user.id
-
-        if not GITHUB_TOKEN:
-            await callback.message.answer("Сервис временно недоступен: отсутствует токен доступа к картам.")
-            return
 
         request_text = user_states.get(user_id, {}).get('request', "No specific request")
 
@@ -306,7 +260,7 @@ def create_router(cards, help_questions):
         block_card = random.choice(block_cards)
         resource_card = random.choice(resource_cards)
 
-        block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
+        block_image_bytes = await download_github_image(block_card['image_url'])
         if not block_image_bytes:
             await callback.message.answer("Не удалось загрузить блок-карту.")
             return
@@ -358,11 +312,7 @@ def create_router(cards, help_questions):
             await callback.message.answer("Ошибка: данные карт утеряны.")
             return
 
-        if not GITHUB_TOKEN:
-            await callback.message.answer("⚠️ Сервис временно недоступен.")
-            return
-
-        resource_image_bytes = await download_github_image(resource_card['image_url'], GITHUB_TOKEN)
+        resource_image_bytes = await download_github_image(resource_card['image_url'])
         if not resource_image_bytes:
             await callback.message.answer("Не удалось загрузить ресурс-карту.")
             return
@@ -475,7 +425,6 @@ def create_router(cards, help_questions):
         await callback.message.answer("Пусть будет прекрасным твой день! 🌸\n\n")
 
     async def schedule_final_message(user_id: int, bot: Bot, delay: int = 180):
-        """Отправляет финальное сообщение через `delay` секунд, если пользователь не взаимодействовал."""
         await asyncio.sleep(delay)
         current_state = user_states.get(user_id, {})
         last_interaction = current_state.get('last_interaction')
