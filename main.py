@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import sys
+import base64
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, Router
@@ -40,16 +41,39 @@ class CardNumber(StatesGroup):
     waiting_for_number = State()
 
 async def download_github_image(image_url: str, token: str) -> bytes | None:
+    if "raw.githubusercontent.com" not in image_url:
+        logging.error(f"❌ Неподдерживаемый URL: {image_url}")
+        return None
+
+    # Преобразуем raw URL → GitHub API URL
+    path_parts = image_url.replace("https://raw.githubusercontent.com/", "").split("/", 3)
+    if len(path_parts) != 4:
+        logging.error(f"❌ Неверный формат raw URL: {image_url}")
+        return None
+    user, repo, branch, file_path = path_parts
+    api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{file_path}"
+
     headers = {}
     if token:
-        headers['Authorization'] = f'token {token}'
+        headers["Authorization"] = f"token {token}"
+        headers["Accept"] = "application/vnd.github.v3+json"
+    else:
+        logging.warning("⚠️ GITHUB_TOKEN не задан")
+        return None
+
     try:
         async with ClientSession() as session:
-            async with session.get(image_url, headers=headers) as resp:
+            async with session.get(api_url, headers=headers) as resp:
                 if resp.status == 200:
-                    return await resp.read()
+                    data = await resp.json()
+                    if "content" in 
+                        return base64.b64decode(data["content"])
+                    else:
+                        logging.error(f"❌ Ответ API не содержит 'content': {data}")
+                        return None
                 else:
-                    logging.error(f"❌ HTTP {resp.status} при загрузке: {image_url}")
+                    error_text = await resp.text()
+                    logging.error(f"❌ HTTP {resp.status} при запросе к GitHub API: {api_url} — {error_text}")
                     return None
     except Exception as e:
         logging.error(f"💥 Ошибка загрузки изображения: {e}")
@@ -59,8 +83,6 @@ def create_router(cards, help_questions):
     router = Router()
     GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
     logging.info(f"GITHUB_TOKEN loaded: {'✅ yes' if GITHUB_TOKEN else '❌ no'}")
-    if not GITHUB_TOKEN:
-        logging.warning("⚠️ GITHUB_TOKEN не задан! Загрузка изображений из приватного репозитория невозможна.")
 
     # ========================
     # 🔹 КОМАНДЫ — САМЫЕ ПЕРВЫЕ
@@ -202,7 +224,7 @@ def create_router(cards, help_questions):
     async def handle_web_app_data(message: Message) -> None:
         try:
             data = json.loads(message.web_app_data.data)
-            if "action" in data:
+            if "action" in 
                 action = data.get("action")
                 if action == "contact_therapy":
                     await message.answer(
@@ -284,7 +306,6 @@ def create_router(cards, help_questions):
         block_card = random.choice(block_cards)
         resource_card = random.choice(resource_cards)
 
-        # ✅ ИСПРАВЛЕНО: было F → теперь GITHUB_TOKEN
         block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
         if not block_image_bytes:
             await callback.message.answer("Не удалось загрузить блок-карту.")
@@ -337,7 +358,6 @@ def create_router(cards, help_questions):
             await callback.message.answer("Ошибка: данные карт утеряны.")
             return
 
-        # ✅ GITHUB_TOKEN уже доступен из замыкания — НЕ нужно повторно вызывать os.getenv
         if not GITHUB_TOKEN:
             await callback.message.answer("⚠️ Сервис временно недоступен.")
             return
