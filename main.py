@@ -58,8 +58,11 @@ async def download_github_image(image_url: str, token: str) -> bytes | None:
 def create_router(cards, help_questions):
     router = Router()
     GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+    logging.info(f"GITHUB_TOKEN loaded: {'✅ yes' if GITHUB_TOKEN else '❌ no'}")
     if not GITHUB_TOKEN:
         logging.warning("⚠️ GITHUB_TOKEN не задан! Загрузка изображений из приватного репозитория невозможна.")
+
+
 
     # ========================
     # 🔹 КОМАНДЫ — САМЫЕ ПЕРВЫЕ
@@ -283,7 +286,7 @@ def create_router(cards, help_questions):
         block_card = random.choice(block_cards)
         resource_card = random.choice(resource_cards)
 
-        block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
+        block_image_bytes = await download_github_image(block_card['image_url'], F)
         if not block_image_bytes:
             await callback.message.answer("Не удалось загрузить блок-карту.")
             return
