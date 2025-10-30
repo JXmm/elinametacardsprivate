@@ -62,8 +62,6 @@ def create_router(cards, help_questions):
     if not GITHUB_TOKEN:
         logging.warning("⚠️ GITHUB_TOKEN не задан! Загрузка изображений из приватного репозитория невозможна.")
 
-
-
     # ========================
     # 🔹 КОМАНДЫ — САМЫЕ ПЕРВЫЕ
     # ========================
@@ -286,40 +284,31 @@ def create_router(cards, help_questions):
         block_card = random.choice(block_cards)
         resource_card = random.choice(resource_cards)
 
-        block_image_bytes = await download_github_image(block_card['image_url'], F)
+        # ✅ ИСПРАВЛЕНО: было F → теперь GITHUB_TOKEN
+        block_image_bytes = await download_github_image(block_card['image_url'], GITHUB_TOKEN)
         if not block_image_bytes:
             await callback.message.answer("Не удалось загрузить блок-карту.")
             return
 
-        # Сохраняем данные карты в состоянии, чтобы использовать позже
         user_states[user_id]['block_card'] = block_card
         user_states[user_id]['resource_card'] = resource_card
         user_states[user_id]['request_text'] = request_text
 
-        # Показываем временное сообщение
         block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытягиваем карту блока...")
-
-        # Отправляем БЛОК-карту БЕЗ кнопки
         await callback.bot.send_photo(
             chat_id=user_id,
             photo=BufferedInputFile(block_image_bytes, filename=f"{block_card['id']}.png")
         )
-
-        # Удаляем временное сообщение
         await callback.bot.delete_message(chat_id=user_id, message_id=block_temp.message_id)
 
         await asyncio.sleep(2)
         await callback.bot.send_message(user_id, "Что ты тут видишь?")
-
         await asyncio.sleep(10)
         await callback.bot.send_message(user_id, "О чем карта говорит, что напоминает?")
-
         await asyncio.sleep(10)
         await callback.bot.send_message(user_id, "Какое чувство она вызывает? Какими событиями вызвано это чувство?")
-
         await asyncio.sleep(15)
 
-        # Кнопки: описание или показать ресурс
         final_kb = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="Подсказки ✨", callback_data=f"desc_block:{block_card['id']}"),
@@ -331,7 +320,7 @@ def create_router(cards, help_questions):
             "Все ли тебе понятно или нужны подсказки? ❤️",
             reply_markup=final_kb
         )
-        
+
     @router.callback_query(lambda c: c.data == "show_resource")
     async def show_resource_handler(callback: CallbackQuery) -> None:
         await callback.answer()
@@ -348,7 +337,7 @@ def create_router(cards, help_questions):
             await callback.message.answer("Ошибка: данные карт утеряны.")
             return
 
-        GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+        # ✅ GITHUB_TOKEN уже доступен из замыкания — НЕ нужно повторно вызывать os.getenv
         if not GITHUB_TOKEN:
             await callback.message.answer("⚠️ Сервис временно недоступен.")
             return
@@ -358,12 +347,10 @@ def create_router(cards, help_questions):
             await callback.message.answer("Не удалось загрузить ресурс-карту.")
             return
 
-        # Анимация "Вытаскиваем карту ресурс..."
         resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытягиваем карту ресурс...")
         await asyncio.sleep(3)
         await callback.bot.delete_message(chat_id=user_id, message_id=resource_temp.message_id)
 
-        # Отправляем РЕСУРС-карту БЕЗ кнопки
         await callback.bot.send_photo(
             chat_id=user_id,
             photo=BufferedInputFile(resource_image_bytes, filename=f"{resource_card['id']}.png")
@@ -371,16 +358,12 @@ def create_router(cards, help_questions):
 
         await asyncio.sleep(2)
         await callback.bot.send_message(user_id, "А что ты видишь тут?")
-
         await asyncio.sleep(10)
         await callback.bot.send_message(user_id, "Понимаешь ли ты, о чем говорит тебе эта карта?")
-
         await asyncio.sleep(10)
         await callback.bot.send_message(user_id, "Что тебе нужно сделать, чтобы это помогло с решением твоего запроса?")
-
         await asyncio.sleep(10)
 
-        # Кнопки: описание или подтверждение понимания
         final_kb = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="Подсказки ✨", callback_data=f"desc_resource:{resource_card['id']}"),
@@ -407,7 +390,6 @@ def create_router(cards, help_questions):
             await callback.message.answer("Сессия устарела.")
             return
 
-        # Сохраняем данные (теперь обе карты показаны)
         request_text = user_states[user_id].get('request_text', "No specific request")
         block_card = user_states[user_id].get('block_card')
         resource_card = user_states[user_id].get('resource_card')
@@ -533,11 +515,9 @@ def main():
 
         app = web.Application()
         app.on_startup.append(on_startup)
-        # 👇 ДОБАВЛЕН /health эндпоинт для Render
         async def health_check(request):
             return web.json_response({"status": "ok"})
         app.router.add_get("/health", health_check)
-        # 👆
 
         SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
         setup_application(app, dp, bot=bot)
