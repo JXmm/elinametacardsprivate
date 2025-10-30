@@ -224,7 +224,9 @@ def create_router(cards, help_questions):
     async def handle_web_app_data(message: Message) -> None:
         try:
             data = json.loads(message.web_app_data.data)
-            if "action" in 
+            if "content" in data:
+                return base64.b64decode(data["content"])
+
                 action = data.get("action")
                 if action == "contact_therapy":
                     await message.answer(
