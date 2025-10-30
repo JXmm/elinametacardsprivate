@@ -1,8 +1,15 @@
 import sqlite3
-from datetime import datetime
+import os
+import logging  # ← добавьте эту строку
+
+# Абсолютный путь к базе внутри контейнера
+DB_PATH = '/app/bot_database.db'
 
 def init_db():
-    conn = sqlite3.connect('bot_database.db')
+    # Убедимся, что папка существует (на всякий случай)
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    conn = sqlite3.connect(DB_PATH)  # ← теперь conn определена!
     cursor = conn.cursor()
 
     # Create users table
@@ -40,7 +47,7 @@ def init_db():
     conn.close()
 
 def add_or_update_user(user_id, first_name):
-    conn = sqlite3.connect('bot_database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -52,7 +59,7 @@ def add_or_update_user(user_id, first_name):
     conn.close()
 
 def get_user(user_id):
-    conn = sqlite3.connect('bot_database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute('SELECT first_name FROM users WHERE user_id = ?', (user_id,))
@@ -62,7 +69,7 @@ def get_user(user_id):
     return user[0] if user else None
 
 def update_current_request(user_id, request_text):
-    conn = sqlite3.connect('bot_database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -73,7 +80,7 @@ def update_current_request(user_id, request_text):
     conn.close()
 
 def clear_current_request(user_id):
-    conn = sqlite3.connect('bot_database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -84,7 +91,7 @@ def clear_current_request(user_id):
     conn.close()
 
 def save_request(user_id, request_text, block_card_id, resource_card_id, block_desc, resource_desc):
-    conn = sqlite3.connect('bot_database.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -94,4 +101,4 @@ def save_request(user_id, request_text, block_card_id, resource_card_id, block_d
     ''', (user_id, request_text, block_card_id, resource_card_id, block_desc, resource_desc))
 
     conn.commit()
-    conn.close();
+    conn.close()

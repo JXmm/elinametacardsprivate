@@ -30,8 +30,12 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN not found in .env")
     sys.exit(1)
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # URL Mini App — ИСПРАВЛЕНО: без пробелов в конце!
-MINI_APP_URL = "https://jxmm.github.io/energy-glow-up-hub/"
+MINI_APP_URL = "https://jxmm.github.io/elina-miniapp/"
 
 # Глобальное состояние (для основного сценария запроса)
 user_states = {}
@@ -294,7 +298,7 @@ def create_router(cards, help_questions):
         user_states[user_id]['request_text'] = request_text
 
         # Показываем временное сообщение
-        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту блока...")
+        block_temp = await callback.bot.send_message(chat_id=user_id, text="Вытягиваем карту блока...")
 
         # Отправляем БЛОК-карту БЕЗ кнопки
         await callback.bot.send_photo(
@@ -356,7 +360,7 @@ def create_router(cards, help_questions):
             return
 
         # Анимация "Вытаскиваем карту ресурс..."
-        resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытаскиваем карту ресурс...")
+        resource_temp = await callback.bot.send_message(chat_id=user_id, text="Вытягиваем карту ресурс...")
         await asyncio.sleep(3)
         await callback.bot.delete_message(chat_id=user_id, message_id=resource_temp.message_id)
 
