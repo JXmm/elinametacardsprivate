@@ -31,7 +31,7 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN not found in .env")
     sys.exit(1)
 
-# URL Mini App — ИСПРАВЛЕНО: убраны пробелы в конце!
+# URL Mini App — исправлено: убраны пробелы в конце!
 MINI_APP_URL = "https://jxmm.github.io/elina-miniapp/"
 
 # Глобальное состояние (для основного сценария запроса)
@@ -66,7 +66,7 @@ async def download_github_image(image_url: str, token: str) -> bytes | None:
             async with session.get(api_url, headers=headers) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    if "content" in 
+                    if "content" in data:
                         return base64.b64decode(data["content"])
                     else:
                         logging.error(f"❌ Ответ API не содержит 'content': {data}")
@@ -103,7 +103,7 @@ def create_router(cards, help_questions):
         await message.answer(greeting)
         await asyncio.sleep(3)
 
-        await message.answer("Перед началом работы c картами сделай, пожалуйста, несколько глубоких вдохов и успокой свои мысли. 😌 \n\n " )
+        await message.answer("Перед началом работы c картами сделай, пожалуйста, несколько глубоких вдохов и успокой свои мысли. 😌 \n\n ")
         await asyncio.sleep(15)
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -224,9 +224,7 @@ def create_router(cards, help_questions):
     async def handle_web_app_data(message: Message) -> None:
         try:
             data = json.loads(message.web_app_data.data)
-            if "content" in data:
-                return base64.b64decode(data["content"])
-
+            if "action" in data:
                 action = data.get("action")
                 if action == "contact_therapy":
                     await message.answer(
@@ -245,7 +243,7 @@ def create_router(cards, help_questions):
                     await message.answer(
                         "Спасибо, что написала РАЗБОР! 🥰\n\n"
                         "Это специальная форма оплаты по сердцу для первой терапии.\n\n"
-                        "Мне @elina_goncova — так как работает наша система: после первичной диагностики я называла сумму, которая резоансна для человека. Иногда это может быть даже 1 рублей.\n\n"
+                        "Мне @elina_goncova — так как работает наша система: после первичной диагностики я называла сумму, которая резонансна для человека. Иногда это может быть даже 1 рубль.\n\n"
                         "Расскажи о своем запросе, с чем хочешь поработать? 💫"
                     )
                 else:
