@@ -1,18 +1,19 @@
 import sqlite3
 import os
-import logging  # ← добавьте эту строку
 
-# Абсолютный путь к базе внутри контейнера
-DB_PATH = '/app/bot_database.db'
+# ✅ Универсальный путь: работает и на Render, и в Docker
+# База создаётся в той же папке, где лежит скрипт (рядом с main.py)
+DB_PATH = os.path.join(os.path.dirname(__file__), "bot_database.db")
 
 def init_db():
-    # Убедимся, что папка существует (на всякий случай)
+    """Инициализация базы данных: создаёт таблицы, если их нет."""
+    # Убедимся, что директория существует (актуально для некоторых систем)
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
-    conn = sqlite3.connect(DB_PATH)  # ← теперь conn определена!
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Create users table
+    # Таблица пользователей
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -22,13 +23,13 @@ def init_db():
         )
     ''')
 
-    # Try to add column if it doesn't exist (for existing databases)
+    # Попытка добавить колонку current_request (если база старая)
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN current_request TEXT;")
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        pass  # Колонка уже существует
 
-    # Create requests table
+    # Таблица запросов
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,56 +50,47 @@ def init_db():
 def add_or_update_user(user_id, first_name):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('''
         INSERT OR REPLACE INTO users (user_id, first_name)
         VALUES (?, ?)
     ''', (user_id, first_name))
-
     conn.commit()
     conn.close()
 
 def get_user(user_id):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('SELECT first_name FROM users WHERE user_id = ?', (user_id,))
     user = cursor.fetchone()
-
     conn.close()
     return user[0] if user else None
 
 def update_current_request(user_id, request_text):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('''
         UPDATE users SET current_request = ? WHERE user_id = ?
     ''', (request_text, user_id))
-
     conn.commit()
     conn.close()
 
 def clear_current_request(user_id):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('''
         UPDATE users SET current_request = NULL WHERE user_id = ?
     ''', (user_id,))
-
     conn.commit()
     conn.close()
 
 def save_request(user_id, request_text, block_card_id, resource_card_id, block_desc, resource_desc):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
     cursor.execute('''
-        INSERT INTO requests (user_id, request_text, block_card_id, resource_card_id,
-                             block_card_description, resource_card_description)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO requests (
+            user_id, request_text, block_card_id, resource_card_id,
+            block_card_description, resource_card_description
+        ) VALUES (?, ?, ?, ?, ?, ?)
     ''', (user_id, request_text, block_card_id, resource_card_id, block_desc, resource_desc))
-
     conn.commit()
     conn.close()
