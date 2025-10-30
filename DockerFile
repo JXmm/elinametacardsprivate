@@ -19,14 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование файлов приложения
 COPY . .
 
-# Создание директории для базы данных
-RUN mkdir -p /app/data
-
-# Установка прав на выполнение
-RUN chmod +x main.py
-
-# Создание не-привилегированного пользователя
-RUN useradd --create-home --shell /bin/bash botuser && \
+# Настройка для не-привилегированного пользователя
+RUN mkdir -p /app/data && \
+    chmod +x main.py && \
+    useradd --create-home --shell /bin/bash botuser && \
     chown -R botuser:botuser /app
 USER botuser
 

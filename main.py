@@ -57,7 +57,7 @@ async def download_github_image(image_url: str) -> bytes | None:
         logging.error(f"💥 Ошибка загрузки изображения: {e}")
         return None
 
-def create_router(cards, help_questions):
+def create_router(cards):
     router = Router()
 
     # ========================
@@ -458,15 +458,14 @@ def create_router(cards, help_questions):
 
 # --- MAIN ---
 def main():
-    logging.basicConfig(level=logging.INFO)
+    # Уровень логирования: INFO для разработки, ERROR для продакшена
+    log_level = logging.ERROR if os.getenv("RENDER_EXTERNAL_URL") else logging.INFO
+    logging.basicConfig(level=log_level)
     init_db()
 
     with open('cards.json', 'r', encoding='utf-8') as f:
         cards = json.load(f)
     logging.info(f"✅ Загружено {len(cards)} карт")
-    with open('help.json', 'r', encoding='utf-8') as f:
-        help_questions = json.load(f)
-    logging.info(f"✅ Загружено {len(help_questions)} вопросов")
 
     if os.getenv("RENDER_EXTERNAL_URL"):
         external_url = os.getenv("RENDER_EXTERNAL_URL")
@@ -476,7 +475,7 @@ def main():
 
         bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dp = Dispatcher()
-        router = create_router(cards, help_questions)
+        router = create_router(cards)
         dp.include_router(router)
 
         async def on_startup(app):
@@ -496,7 +495,7 @@ def main():
             bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
             await bot.delete_webhook(drop_pending_updates=True)
             dp = Dispatcher()
-            router = create_router(cards, help_questions)
+            router = create_router(cards)
             dp.include_router(router)
             await dp.start_polling(bot, skip_updates=True)
 

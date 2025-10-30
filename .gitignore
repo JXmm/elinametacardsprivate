@@ -31,7 +31,7 @@ bot_database.db
 # Docker
 # ========================
 .dockerignore
-DockerFile  # если вы используете неправильное написание (правильно — Dockerfile)
+Dockerfile
 
 # ========================
 # IDE / Editors
